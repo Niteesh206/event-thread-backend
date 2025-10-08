@@ -1,4 +1,118 @@
+// import mongoose from 'mongoose';
+
+// // User Schema
+// const userSchema = new mongoose.Schema({
+//   username: {
+//     type: String,
+//     required: true,
+//     unique: true,
+//     trim: true,
+//     maxlength: 50
+//   },
+//   email: {
+//     type: String,
+//     trim: true,
+//     lowercase: true
+//   },
+//   isAdmin: {
+//     type: Boolean,
+//     default: false
+//   }
+// }, {
+//   timestamps: true
+// });
+
+// // Thread Schema
+// const threadSchema = new mongoose.Schema({
+//   title: {
+//     type: String,
+//     required: true,
+//     trim: true,
+//     maxlength: 200
+//   },
+//   description: {
+//     type: String,
+//     required: true,
+//     trim: true
+//   },
+//   creator: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'User',
+//     required: true
+//   },
+//   creatorUsername: {
+//     type: String,
+//     required: true
+//   },
+//   location: {
+//     type: String,
+//     required: true,
+//     trim: true,
+//     maxlength: 200
+//   },
+//   tags: [{
+//     type: String,
+//     trim: true
+//   }],
+//   members: [{
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'User'
+//   }],
+//   pendingRequests: [{
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'User'
+//   }],
+//   expiresAt: {
+//     type: Date,
+//     required: true,
+//     index: { expires: 0 } // TTL index - auto-delete expired threads
+//   }
+// }, {
+//   timestamps: true
+// });
+
+// // Message Schema
+// const messageSchema = new mongoose.Schema({
+//   threadId: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'Thread',
+//     required: true
+//   },
+//   userId: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     ref: 'User',
+//     required: true
+//   },
+//   username: {
+//     type: String,
+//     required: true
+//   },
+//   message: {
+//     type: String,
+//     required: true,
+//     trim: true
+//   },
+//   timestamp: {
+//     type: Date,
+//     default: Date.now
+//   }
+// });
+
+// // Indexes for performance
+// userSchema.index({ username: 1 });
+// threadSchema.index({ creator: 1 });
+// threadSchema.index({ expiresAt: 1 });
+// threadSchema.index({ createdAt: -1 });
+// messageSchema.index({ threadId: 1, timestamp: -1 });
+
+// // Models
+// const User = mongoose.model('User', userSchema);
+// const Thread = mongoose.model('Thread', threadSchema);
+// const Message = mongoose.model('Message', messageSchema);
+
+// export { User, Thread, Message };
 import mongoose from 'mongoose';
+import bcrypt from 'bcrypt';
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -8,6 +122,11 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     maxlength: 50
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 6
   },
   email: {
     type: String,
@@ -21,6 +140,24 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Method to compare password
+userSchema.methods.comparePassword = async function(candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
 
 // Thread Schema
 const threadSchema = new mongoose.Schema({
@@ -65,7 +202,7 @@ const threadSchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     required: true,
-    index: { expires: 0 } // TTL index - auto-delete expired threads
+    index: { expires: 0 }
   }
 }, {
   timestamps: true

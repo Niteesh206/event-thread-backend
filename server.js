@@ -106,7 +106,7 @@ const httpServer = createServer(app);
 
 // CORS Configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'https://prastha.vercel.app/',
+  origin: process.env.FRONTEND_URL || 'https://prastha.vercel.app',
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -221,6 +221,6 @@ httpServer.listen(PORT, () => {
   console.log(`📡 API: http://localhost:${PORT}/api`);
   console.log(`🔍 Health: http://localhost:${PORT}/api/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL || 'https://prastha.vercel.app/'}`);
+  console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL || 'https://prastha.vercel.app'}`);
   console.log(`⚡ WebSocket enabled`);
 });

@@ -169,6 +169,7 @@ connectDB();
 app.use('/api/auth', authRoutes);
 app.use('/api/threads', threadRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/gossips', gossipRoutes);
 
 // Root route
 app.get('/', (req, res) => {

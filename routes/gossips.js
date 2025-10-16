@@ -1,5 +1,7 @@
 import express from 'express';
-import { Gossip, GossipComment, User } from '../models/index.js';
+import Gossip from '../models/Gossip.js';
+import GossipComment from '../models/GossipComment.js';
+import User from '../models/User.js';
 
 const router = express.Router();
 

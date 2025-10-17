@@ -679,7 +679,6 @@
 
 // export { User, Thread, Message, Gossip, GossipComment };
 
-//gpt1
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 
@@ -839,8 +838,8 @@ const gossipSchema = new mongoose.Schema({
   },
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
-    index: { expires: 0 } // TTL index
+    default: () => new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+    index: { expires: 0 } // TTL index - auto-delete after expiresAt
   }
 }, {
   timestamps: true
@@ -853,33 +852,7 @@ gossipSchema.methods.updateActivity = function() {
   return this.save();
 };
 
-// Gossip Comment Schema (with replies array)
-const replySubSchema = new mongoose.Schema({
-  content: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 300
-  },
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false
-  },
-  authorUsername: {
-    type: String,
-    required: false
-  },
-  isAnonymous: {
-    type: Boolean,
-    default: false
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-}, { _id: true });
-
+// Gossip Comment Schema
 const gossipCommentSchema = new mongoose.Schema({
   gossipId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -904,10 +877,6 @@ const gossipCommentSchema = new mongoose.Schema({
   isAnonymous: {
     type: Boolean,
     default: false
-  },
-  replies: {
-    type: [replySubSchema],
-    default: []
   }
 }, {
   timestamps: true

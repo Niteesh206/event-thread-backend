@@ -456,21 +456,27 @@
 // export default router;
 
 
-//gpt1
 import express from 'express';
 import { Gossip, GossipComment } from '../models/index.js';
 
 const router = express.Router();
 
+// GET /api/gossips - Get all gossips
 router.get('/', async (req, res) => {
   try {
     const { sortBy = 'newest' } = req.query;
-
+    
     let sortOptions = { createdAt: -1 }; // Default: newest first
-    if (sortBy === 'popular') sortOptions = { upvotes: -1 };
-    else if (sortBy === 'controversial') sortOptions = { downvotes: -1 };
+    
+    if (sortBy === 'popular') {
+      sortOptions = { upvotes: -1 };
+    } else if (sortBy === 'controversial') {
+      sortOptions = { downvotes: -1 };
+    }
 
-    const gossips = await Gossip.find().sort(sortOptions).lean();
+    const gossips = await Gossip.find()
+      .sort(sortOptions)
+      .lean();
 
     const gossipsWithComments = await Promise.all(
       gossips.map(async (gossip) => {
@@ -482,33 +488,25 @@ router.get('/', async (req, res) => {
           id: gossip._id.toString(),
           content: gossip.content,
           author: gossip.authorUsername,
-          authorId: gossip.author?.toString() || null,
-          isAnonymous: gossip.isAnonymous || false,
+          authorId: gossip.author.toString(),
+          isAnonymous: false,
           upvotes: gossip.upvotedBy?.length || 0,
           downvotes: gossip.downvotedBy?.length || 0,
-          upvotedBy: gossip.upvotedBy?.map((id) => id.toString()) || [],
-          downvotedBy: gossip.downvotedBy?.map((id) => id.toString()) || [],
-          lastActivity: gossip.lastActivity ? gossip.lastActivity.toISOString() : null,
-          expiresAt: gossip.expiresAt ? gossip.expiresAt.toISOString() : null,
-          createdAt: gossip.createdAt ? gossip.createdAt.toISOString() : null,
-          comments: comments.map((comment) => ({
+          upvotedBy: gossip.upvotedBy?.map(id => id.toString()) || [],
+          downvotedBy: gossip.downvotedBy?.map(id => id.toString()) || [],
+          lastActivity: gossip.lastActivity.toISOString(),
+          expiresAt: gossip.expiresAt.toISOString(),
+          comments: comments.map(comment => ({
             id: comment._id.toString(),
             content: comment.content,
             author: comment.authorUsername,
-            authorId: comment.author?.toString() || null,
-            isAnonymous: comment.isAnonymous || false,
+            authorId: comment.author.toString(),
+            isAnonymous: false,
             parentCommentId: comment.parentCommentId?.toString() || null,
-            replyTo: comment.replyTo || null,
-            createdAt: comment.createdAt ? comment.createdAt.toISOString() : null,
-            // include replies if any
-            replies: (comment.replies || []).map((r) => ({
-              id: r._id?.toString() || null,
-              content: r.content,
-              author: r.authorUsername || r.author || 'Anonymous',
-              isAnonymous: r.isAnonymous || false,
-              createdAt: r.createdAt ? r.createdAt.toISOString() : null
-            }))
-          }))
+            replyTo: comment.replyTo,
+            createdAt: comment.createdAt.toISOString()
+          })),
+          createdAt: gossip.createdAt.toISOString()
         };
       })
     );
@@ -520,15 +518,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create new gossip
+// POST /api/gossips - Create new gossip
 router.post('/', async (req, res) => {
   try {
-    const { content, authorId, authorUsername, isAnonymous = false } = req.body;
+    const { content, authorId, authorUsername } = req.body;
 
     if (!content || !content.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Gossip content is required',
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Gossip content is required' 
       });
     }
 
@@ -536,9 +534,9 @@ router.post('/', async (req, res) => {
       content: content.trim(),
       author: authorId,
       authorUsername,
-      isAnonymous,
+      isAnonymous: false,
       upvotedBy: [],
-      downvotedBy: [],
+      downvotedBy: []
     });
 
     await gossip.save();
@@ -549,15 +547,15 @@ router.post('/', async (req, res) => {
         id: gossip._id.toString(),
         content: gossip.content,
         author: gossip.authorUsername,
-        authorId: gossip.author?.toString() || null,
-        isAnonymous: gossip.isAnonymous,
+        authorId: gossip.author.toString(),
+        isAnonymous: false,
         upvotes: 0,
         downvotes: 0,
         upvotedBy: [],
         downvotedBy: [],
         comments: [],
-        createdAt: gossip.createdAt ? gossip.createdAt.toISOString() : null,
-      },
+        createdAt: gossip.createdAt.toISOString()
+      }
     });
   } catch (error) {
     console.error('❌ CREATE GOSSIP ERROR:', error);
@@ -565,45 +563,42 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Vote (up/down)
+// POST /api/gossips/:id/vote - Upvote or downvote
 router.post('/:id/vote', async (req, res) => {
   try {
     const { id } = req.params;
-    const { userId, voteType } = req.body; // 'up' or 'down'
+    const { userId, voteType } = req.body; // voteType: 'up' or 'down'
 
     const gossip = await Gossip.findById(id);
     if (!gossip) {
       return res.status(404).json({ success: false, message: 'Gossip not found' });
     }
 
-    // Remove user from both arrays first
-    gossip.upvotedBy = (gossip.upvotedBy || []).filter((uid) => uid.toString() !== userId);
-    gossip.downvotedBy = (gossip.downvotedBy || []).filter((uid) => uid.toString() !== userId);
+    // Remove from both arrays first
+    gossip.upvotedBy = gossip.upvotedBy.filter(uid => uid.toString() !== userId);
+    gossip.downvotedBy = gossip.downvotedBy.filter(uid => uid.toString() !== userId);
 
     // Add to appropriate array
-    if (voteType === 'up') gossip.upvotedBy.push(userId);
-    else if (voteType === 'down') gossip.downvotedBy.push(userId);
+    if (voteType === 'up') {
+      gossip.upvotedBy.push(userId);
+    } else if (voteType === 'down') {
+      gossip.downvotedBy.push(userId);
+    }
 
     await gossip.save();
-    // update activity timestamp
-    if (typeof gossip.updateActivity === 'function') {
-      try { await gossip.updateActivity(); } catch (e) { /* ignore */ }
-    }
 
     // Emit socket event
     const io = req.app.get('io');
-    if (io) {
-      io.emit('gossip-updated', {
-        gossipId: id,
-        upvotes: gossip.upvotedBy.length,
-        downvotes: gossip.downvotedBy.length,
-      });
-    }
+    io.emit('gossip-updated', {
+      gossipId: id,
+      upvotes: gossip.upvotedBy.length,
+      downvotes: gossip.downvotedBy.length
+    });
 
-    res.json({
+    res.json({ 
       success: true,
       upvotes: gossip.upvotedBy.length,
-      downvotes: gossip.downvotedBy.length,
+      downvotes: gossip.downvotedBy.length
     });
   } catch (error) {
     console.error('❌ VOTE ERROR:', error);
@@ -611,16 +606,16 @@ router.post('/:id/vote', async (req, res) => {
   }
 });
 
-// Add comment to gossip
+// POST /api/gossips/:id/comments - Add comment
 router.post('/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, authorId, authorUsername, isAnonymous = false } = req.body;
+    const { content, authorId, authorUsername } = req.body;
 
     if (!content || !content.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Comment content is required',
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Comment content is required' 
       });
     }
 
@@ -629,15 +624,14 @@ router.post('/:id/comments', async (req, res) => {
       content: content.trim(),
       author: authorId,
       authorUsername,
-      isAnonymous,
-      replies: []
+      isAnonymous: false
     });
 
     await comment.save();
 
     // Emit socket event
     const io = req.app.get('io');
-    if (io) io.emit('gossip-comment-added', { gossipId: id });
+    io.emit('gossip-comment-added', { gossipId: id });
 
     res.status(201).json({
       success: true,
@@ -645,11 +639,10 @@ router.post('/:id/comments', async (req, res) => {
         id: comment._id.toString(),
         content: comment.content,
         author: comment.authorUsername,
-        authorId: comment.author?.toString() || null,
-        isAnonymous: comment.isAnonymous || false,
-        createdAt: comment.createdAt ? comment.createdAt.toISOString() : null,
-        replies: []
-      },
+        authorId: comment.author.toString(),
+        isAnonymous: false,
+        createdAt: comment.createdAt.toISOString()
+      }
     });
   } catch (error) {
     console.error('❌ ADD COMMENT ERROR:', error);
@@ -657,58 +650,7 @@ router.post('/:id/comments', async (req, res) => {
   }
 });
 
-// Add reply to a specific comment
-router.post('/:gossipId/comments/:commentId/replies', async (req, res) => {
-  try {
-    const { gossipId, commentId } = req.params;
-    const { content, authorId, authorUsername, isAnonymous = false } = req.body;
-
-    if (!content || !content.trim()) {
-      return res.status(400).json({ success: false, message: 'Reply content is required' });
-    }
-
-    const comment = await GossipComment.findById(commentId);
-    if (!comment) {
-      return res.status(404).json({ success: false, message: 'Comment not found' });
-    }
-
-    // push reply subdocument
-    const reply = {
-      content: content.trim(),
-      author: authorId || null,
-      authorUsername: authorUsername || (authorId ? 'User' : 'Anonymous'),
-      isAnonymous: !!isAnonymous,
-      createdAt: new Date()
-    };
-
-    comment.replies = comment.replies || [];
-    comment.replies.push(reply);
-    await comment.save();
-
-    // Emit socket event to notify clients (refresh comments)
-    const io = req.app.get('io');
-    if (io) io.emit('gossip-comment-added', { gossipId });
-
-    // return created reply (last element)
-    const createdReply = comment.replies[comment.replies.length - 1];
-
-    res.status(201).json({
-      success: true,
-      reply: {
-        id: createdReply._id?.toString() || null,
-        content: createdReply.content,
-        author: createdReply.authorUsername || (createdReply.author?.toString() || null),
-        isAnonymous: createdReply.isAnonymous || false,
-        createdAt: createdReply.createdAt ? createdReply.createdAt.toISOString() : null
-      }
-    });
-  } catch (error) {
-    console.error('❌ ADD REPLY ERROR:', error);
-    res.status(500).json({ success: false, message: 'Error adding reply' });
-  }
-});
-
-// Delete gossip
+// DELETE /api/gossips/:id - Delete gossip (admin or author)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -719,22 +661,22 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Gossip not found' });
     }
 
-    // Check authorization
-    if (userId !== 'admin_001' && gossip.author?.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to delete this gossip',
+    // Check if user is admin or author
+    if (userId !== 'admin_001' && gossip.author.toString() !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Not authorized to delete this gossip' 
       });
     }
 
     await Promise.all([
       Gossip.findByIdAndDelete(id),
-      GossipComment.deleteMany({ gossipId: id }),
+      GossipComment.deleteMany({ gossipId: id })
     ]);
 
     // Emit socket event
     const io = req.app.get('io');
-    if (io) io.emit('gossip-deleted', { gossipId: id });
+    io.emit('gossip-deleted', { gossipId: id });
 
     res.json({ success: true, message: 'Gossip deleted' });
   } catch (error) {

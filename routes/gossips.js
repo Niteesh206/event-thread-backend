@@ -1,7 +1,5 @@
 import express from 'express';
-import Gossip from '../models/Gossip.js';
-import GossipComment from '../models/GossipComment.js';
-import User from '../models/User.js';
+import { Gossip, GossipComment } from '../models/index.js';
 
 const router = express.Router();
 
@@ -31,9 +29,9 @@ router.get('/', async (req, res) => {
         return {
           id: gossip._id.toString(),
           content: gossip.content,
-          author: gossip.isAnonymous ? 'Anonymous' : gossip.authorUsername,
+          author: gossip.authorUsername,
           authorId: gossip.author.toString(),
-          isAnonymous: gossip.isAnonymous,
+          isAnonymous: false,
           upvotes: gossip.upvotedBy?.length || 0,
           downvotes: gossip.downvotedBy?.length || 0,
           upvotedBy: gossip.upvotedBy?.map(id => id.toString()) || [],
@@ -41,9 +39,9 @@ router.get('/', async (req, res) => {
           comments: comments.map(comment => ({
             id: comment._id.toString(),
             content: comment.content,
-            author: comment.isAnonymous ? 'Anonymous' : comment.authorUsername,
+            author: comment.authorUsername,
             authorId: comment.author.toString(),
-            isAnonymous: comment.isAnonymous,
+            isAnonymous: false,
             createdAt: comment.createdAt.toISOString()
           })),
           createdAt: gossip.createdAt.toISOString()
@@ -61,7 +59,7 @@ router.get('/', async (req, res) => {
 // POST /api/gossips - Create new gossip
 router.post('/', async (req, res) => {
   try {
-    const { content, authorId, authorUsername, isAnonymous } = req.body;
+    const { content, authorId, authorUsername } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ 
@@ -74,7 +72,7 @@ router.post('/', async (req, res) => {
       content: content.trim(),
       author: authorId,
       authorUsername,
-      isAnonymous: isAnonymous || false,
+      isAnonymous: false,
       upvotedBy: [],
       downvotedBy: []
     });
@@ -86,9 +84,9 @@ router.post('/', async (req, res) => {
       gossip: {
         id: gossip._id.toString(),
         content: gossip.content,
-        author: gossip.isAnonymous ? 'Anonymous' : gossip.authorUsername,
+        author: gossip.authorUsername,
         authorId: gossip.author.toString(),
-        isAnonymous: gossip.isAnonymous,
+        isAnonymous: false,
         upvotes: 0,
         downvotes: 0,
         upvotedBy: [],
@@ -150,7 +148,7 @@ router.post('/:id/vote', async (req, res) => {
 router.post('/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, authorId, authorUsername, isAnonymous } = req.body;
+    const { content, authorId, authorUsername } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ 
@@ -164,7 +162,7 @@ router.post('/:id/comments', async (req, res) => {
       content: content.trim(),
       author: authorId,
       authorUsername,
-      isAnonymous: isAnonymous || false
+      isAnonymous: false
     });
 
     await comment.save();
@@ -178,9 +176,9 @@ router.post('/:id/comments', async (req, res) => {
       comment: {
         id: comment._id.toString(),
         content: comment.content,
-        author: comment.isAnonymous ? 'Anonymous' : comment.authorUsername,
+        author: comment.authorUsername,
         authorId: comment.author.toString(),
-        isAnonymous: comment.isAnonymous,
+        isAnonymous: false,
         createdAt: comment.createdAt.toISOString()
       }
     });

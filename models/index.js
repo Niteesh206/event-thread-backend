@@ -255,7 +255,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 
-
 // User Schema
 const userSchema = new mongoose.Schema({
   username: {
@@ -446,10 +445,14 @@ threadSchema.index({ creator: 1 });
 threadSchema.index({ expiresAt: 1 });
 threadSchema.index({ createdAt: -1 });
 messageSchema.index({ threadId: 1, timestamp: -1 });
+gossipSchema.index({ createdAt: -1 });
+gossipCommentSchema.index({ gossipId: 1, createdAt: -1 });
 
 // Models
 const User = mongoose.model('User', userSchema);
 const Thread = mongoose.model('Thread', threadSchema);
 const Message = mongoose.model('Message', messageSchema);
+const Gossip = mongoose.model('Gossip', gossipSchema);
+const GossipComment = mongoose.model('GossipComment', gossipCommentSchema);
 
-export { User, Thread, Message };
+export { User, Thread, Message, Gossip, GossipComment };

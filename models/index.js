@@ -852,7 +852,7 @@ gossipSchema.methods.updateActivity = function() {
   return this.save();
 };
 
-// Gossip Comment Schema
+// Gossip Comment Schema - UPDATED for Reddit-style threaded comments
 const gossipCommentSchema = new mongoose.Schema({
   gossipId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -877,6 +877,16 @@ const gossipCommentSchema = new mongoose.Schema({
   isAnonymous: {
     type: Boolean,
     default: false
+  },
+  // NEW FIELDS for Reddit-style threaded comments
+  parentCommentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'GossipComment',
+    default: null
+  },
+  replyTo: {
+    type: String, // Username being replied to
+    default: null
   }
 }, {
   timestamps: true
@@ -890,6 +900,8 @@ threadSchema.index({ createdAt: -1 });
 messageSchema.index({ threadId: 1, timestamp: -1 });
 gossipSchema.index({ createdAt: -1 });
 gossipCommentSchema.index({ gossipId: 1, createdAt: -1 });
+// NEW INDEXES for threaded comments
+gossipCommentSchema.index({ gossipId: 1, parentCommentId: 1 });
 
 // Models
 const User = mongoose.model('User', userSchema);
@@ -898,4 +910,4 @@ const Message = mongoose.model('Message', messageSchema);
 const Gossip = mongoose.model('Gossip', gossipSchema);
 const GossipComment = mongoose.model('GossipComment', gossipCommentSchema);
 
-export { User, Thread, Message, Gossip, GossipComment };
+export { User, Thread, Message, Gossip, GossipComment };  

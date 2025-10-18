@@ -480,8 +480,9 @@ router.get('/', async (req, res) => {
 
     const gossipsWithComments = await Promise.all(
       gossips.map(async (gossip) => {
+        // Get ALL comments (including replies) sorted by creation time
         const comments = await GossipComment.find({ gossipId: gossip._id })
-          .sort({ createdAt: -1 })
+          .sort({ createdAt: 1 }) // Ascending order for better threading
           .lean();
 
         return {
@@ -503,7 +504,7 @@ router.get('/', async (req, res) => {
             authorId: comment.author.toString(),
             isAnonymous: false,
             parentCommentId: comment.parentCommentId?.toString() || null,
-            replyTo: comment.replyTo,
+            replyTo: comment.replyTo || null,
             createdAt: comment.createdAt.toISOString()
           })),
           createdAt: gossip.createdAt.toISOString()
@@ -606,11 +607,11 @@ router.post('/:id/vote', async (req, res) => {
   }
 });
 
-// POST /api/gossips/:id/comments - Add comment
+// POST /api/gossips/:id/comments - Add comment or reply
 router.post('/:id/comments', async (req, res) => {
   try {
     const { id } = req.params;
-    const { content, authorId, authorUsername } = req.body;
+    const { content, authorId, authorUsername, parentCommentId, replyTo } = req.body;
 
     if (!content || !content.trim()) {
       return res.status(400).json({ 
@@ -619,15 +620,30 @@ router.post('/:id/comments', async (req, res) => {
       });
     }
 
-    const comment = new GossipComment({
+    // Create comment object with optional parent and replyTo fields
+    const commentData = {
       gossipId: id,
       content: content.trim(),
       author: authorId,
       authorUsername,
       isAnonymous: false
-    });
+    };
 
+    // Add parentCommentId and replyTo if this is a reply
+    if (parentCommentId) {
+      commentData.parentCommentId = parentCommentId;
+    }
+    if (replyTo) {
+      commentData.replyTo = replyTo;
+    }
+
+    const comment = new GossipComment(commentData);
     await comment.save();
+
+    // Update gossip's lastActivity
+    await Gossip.findByIdAndUpdate(id, { 
+      lastActivity: new Date() 
+    });
 
     // Emit socket event
     const io = req.app.get('io');
@@ -641,6 +657,8 @@ router.post('/:id/comments', async (req, res) => {
         author: comment.authorUsername,
         authorId: comment.author.toString(),
         isAnonymous: false,
+        parentCommentId: comment.parentCommentId?.toString() || null,
+        replyTo: comment.replyTo || null,
         createdAt: comment.createdAt.toISOString()
       }
     });

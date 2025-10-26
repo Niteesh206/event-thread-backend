@@ -1,12 +1,15 @@
+// //working
+
+// //2
 // import express from 'express';
 // import { Thread, Message, User } from '../models/index.js';
 
 // const router = express.Router();
 
-// // GET /api/admin/dashboard - Get admin dashboard data
-// router.get('/dashboard', async (req, res) => {
+// // GET /api/admin/dashboard/:userId - Get admin dashboard data
+// router.get('/dashboard/:userId', async (req, res) => {
 //   try {
-//     const { userId } = req.query;
+//     const { userId } = req.params;
 
 //     console.log('\n🛡️  ADMIN DASHBOARD REQUEST | User ID:', userId);
 
@@ -90,20 +93,18 @@
 
 // export default router;
 
-//2
 import express from 'express';
-import { Thread, Message, User } from '../models/index.js';
+import { Thread, Message, User, CommentReport } from '../models/index.js';
 
 const router = express.Router();
 
-// GET /api/admin/dashboard/:userId - Get admin dashboard data
+// GET /api/admin/dashboard/:userId
 router.get('/dashboard/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
     console.log('\n🛡️  ADMIN DASHBOARD REQUEST | User ID:', userId);
 
-    // Check if admin
     if (userId !== 'admin_001') {
       console.log('❌ ACCESS DENIED: Not admin');
       return res.status(403).json({ 
@@ -112,21 +113,21 @@ router.get('/dashboard/:userId', async (req, res) => {
       });
     }
 
-    const [threads, users] = await Promise.all([
+    const [threads, users, pendingReports] = await Promise.all([
       Thread.find({ expiresAt: { $gt: new Date() } })
         .populate('members', 'username')
         .lean(),
-      User.find({ isAdmin: false }).lean()
+      User.find({ isAdmin: false }).lean(),
+      CommentReport.find({ status: 'pending' }).lean()
     ]);
 
     console.log('📊 ADMIN DASHBOARD DATA:');
     console.log(`  └─ Total Threads: ${threads.length}`);
     console.log(`  └─ Total Users: ${users.length}`);
-    console.log(`  └─ Active Users: ${users.length}`);
+    console.log(`  └─ Pending Reports: ${pendingReports.length}`);
 
     const threadsWithDetails = await Promise.all(
       threads.map(async (thread) => {
-        // Get all messages for this thread
         const messages = await Message.find({ threadId: thread._id })
           .sort({ timestamp: 1 })
           .lean();
@@ -162,10 +163,12 @@ router.get('/dashboard/:userId', async (req, res) => {
       totalThreads: threads.length,
       totalUsers: users.length + 1,
       activeUsers: users.length,
+      pendingReports: pendingReports.length,
       threads: threadsWithDetails,
       users: users.map(user => ({
         id: user._id.toString(),
         username: user.username,
+        email: user.email,
         createdAt: user.createdAt.toISOString()
       }))
     };

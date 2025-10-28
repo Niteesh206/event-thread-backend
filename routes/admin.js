@@ -98,7 +98,6 @@ import { Thread, Message, User, CommentReport } from '../models/index.js';
 
 const router = express.Router();
 
-// GET /api/admin/dashboard/:userId
 router.get('/dashboard/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -168,7 +167,6 @@ router.get('/dashboard/:userId', async (req, res) => {
       users: users.map(user => ({
         id: user._id.toString(),
         username: user.username,
-        email: user.email,
         createdAt: user.createdAt.toISOString()
       }))
     };

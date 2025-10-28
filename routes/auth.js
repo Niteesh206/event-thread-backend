@@ -160,57 +160,56 @@ import { User } from '../models/index.js';
 
 const router = express.Router();
 
-// Register
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, password } = req.body;
 
-    // Validation
-    if (!username || !email || !password) {
+    console.log('📝 REGISTER REQUEST:', { username, hasPassword: !!password });
+
+    if (!username || !password) {
+      console.log('❌ Missing fields');
       return res.status(400).json({ 
         success: false, 
-        message: 'Username, email, and password are required' 
+        message: 'Username and password are required' 
       });
     }
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    const trimmedUsername = username.trim();
+
+    if (!trimmedUsername) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Please provide a valid email address' 
+        message: 'Username cannot be empty' 
       });
     }
 
-    // Check if user exists
-    const existingUser = await User.findOne({ 
-      $or: [{ username }, { email }] 
-    });
+    if (password.length < 6) {
+      console.log('❌ Password too short');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Password must be at least 6 characters' 
+      });
+    }
+
+    const existingUser = await User.findOne({ username: trimmedUsername });
 
     if (existingUser) {
-      if (existingUser.username === username) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Username already exists' 
-        });
-      }
-      if (existingUser.email === email) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Email already registered' 
-        });
-      }
+      console.log('❌ Username already exists:', trimmedUsername);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username already taken' 
+      });
     }
 
-    // Create user
     const user = new User({
-      username: username.trim(),
-      email: email.trim().toLowerCase(),
+      username: trimmedUsername,
       password,
       isAdmin: false
     });
 
     await user.save();
+
+    console.log('✅ USER REGISTERED:', trimmedUsername, '| ID:', user._id);
 
     res.status(201).json({
       success: true,
@@ -218,53 +217,91 @@ router.post('/register', async (req, res) => {
       user: {
         id: user._id.toString(),
         username: user.username,
-        email: user.email,
         isAdmin: user.isAdmin
       }
     });
   } catch (error) {
     console.error('❌ REGISTER ERROR:', error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username already exists' 
+      });
+    }
+
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        success: false, 
+        message: messages.join(', ')
+      });
+    }
+    
     res.status(500).json({ 
       success: false, 
-      message: 'Error creating account' 
+      message: 'Error creating account. Please try again.' 
     });
   }
 });
 
-// Login
 router.post('/login', async (req, res) => {
   try {
-    const { emailOrUsername, password } = req.body;
+    const { username, password, isAdmin } = req.body;
 
-    if (!emailOrUsername || !password) {
-      return res.status(400).json({ 
+    console.log('🔐 LOGIN REQUEST:', { username, isAdmin: !!isAdmin });
+
+    if (isAdmin) {
+      console.log('🛡️  ADMIN LOGIN ATTEMPT:', username);
+      if (
+        username === process.env.ADMIN_USERNAME && 
+        password === process.env.ADMIN_PASSWORD
+      ) {
+        console.log('✅ ADMIN LOGIN SUCCESSFUL');
+        return res.json({
+          success: true,
+          user: {
+            id: 'admin_001',
+            username: process.env.ADMIN_USERNAME,
+            isAdmin: true
+          },
+          message: 'Admin login successful'
+        });
+      }
+      console.log('❌ ADMIN LOGIN FAILED');
+      return res.status(401).json({ 
         success: false, 
-        message: 'Email/username and password are required' 
+        message: 'Invalid admin credentials' 
       });
     }
 
-    // Find user by email OR username
-    const user = await User.findOne({
-      $or: [
-        { email: emailOrUsername.toLowerCase() },
-        { username: emailOrUsername }
-      ]
-    });
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Username and password are required' 
+      });
+    }
+
+    const user = await User.findOne({ username });
 
     if (!user) {
+      console.log('❌ User not found:', username);
       return res.status(401).json({ 
         success: false, 
-        message: 'Invalid credentials' 
+        message: 'Invalid username or password' 
       });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
+      console.log('❌ Invalid password for user:', user.username);
       return res.status(401).json({ 
         success: false, 
-        message: 'Invalid credentials' 
+        message: 'Invalid username or password' 
       });
     }
+
+    console.log('✅ USER LOGGED IN:', user.username, '| ID:', user._id);
 
     res.json({
       success: true,
@@ -272,7 +309,6 @@ router.post('/login', async (req, res) => {
       user: {
         id: user._id.toString(),
         username: user.username,
-        email: user.email,
         isAdmin: user.isAdmin
       }
     });
@@ -280,12 +316,11 @@ router.post('/login', async (req, res) => {
     console.error('❌ LOGIN ERROR:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Error logging in' 
+      message: 'Error logging in. Please try again.' 
     });
   }
 });
 
-// Get user by ID
 router.get('/user/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select('-password');
@@ -302,7 +337,6 @@ router.get('/user/:id', async (req, res) => {
       user: {
         id: user._id.toString(),
         username: user.username,
-        email: user.email,
         isAdmin: user.isAdmin
       }
     });

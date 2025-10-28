@@ -236,7 +236,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 
-// User Schema
+// User Schema - NO EMAIL REQUIRED
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -252,10 +252,9 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: true,
-    unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    default: null
   },
   isAdmin: {
     type: Boolean,
@@ -265,7 +264,6 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
@@ -278,12 +276,10 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Method to compare password
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Thread Schema
 const threadSchema = new mongoose.Schema({
   title: {
     type: String,
@@ -332,7 +328,6 @@ const threadSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Message Schema
 const messageSchema = new mongoose.Schema({
   threadId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -359,7 +354,6 @@ const messageSchema = new mongoose.Schema({
   }
 });
 
-// Gossip Schema
 const gossipSchema = new mongoose.Schema({
   content: {
     type: String,
@@ -394,21 +388,19 @@ const gossipSchema = new mongoose.Schema({
   },
   expiresAt: {
     type: Date,
-    default: () => new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+    default: () => new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
     index: { expires: 0 }
   }
 }, {
   timestamps: true
 });
 
-// Update lastActivity when votes or comments are added
 gossipSchema.methods.updateActivity = function() {
   this.lastActivity = new Date();
   this.expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
   return this.save();
 };
 
-// Gossip Comment Schema
 const gossipCommentSchema = new mongoose.Schema({
   gossipId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -447,7 +439,6 @@ const gossipCommentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// NEW: Comment Report Schema
 const commentReportSchema = new mongoose.Schema({
   gossipId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -506,9 +497,7 @@ const commentReportSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for performance
 userSchema.index({ username: 1 });
-userSchema.index({ email: 1 });
 threadSchema.index({ creator: 1 });
 threadSchema.index({ expiresAt: 1 });
 threadSchema.index({ createdAt: -1 });
@@ -519,7 +508,6 @@ gossipCommentSchema.index({ gossipId: 1, parentCommentId: 1 });
 commentReportSchema.index({ status: 1, createdAt: -1 });
 commentReportSchema.index({ commentId: 1 });
 
-// Models
 const User = mongoose.model('User', userSchema);
 const Thread = mongoose.model('Thread', threadSchema);
 const Message = mongoose.model('Message', messageSchema);
